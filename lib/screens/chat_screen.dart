@@ -16,6 +16,7 @@ import 'package:ai_assistant/services/dify_service.dart';
 import 'package:ai_assistant/services/xiaozhi_service.dart';
 import 'package:ai_assistant/services/minimax_service.dart';
 import 'package:ai_assistant/widgets/message_bubble.dart';
+import 'package:ai_assistant/widgets/interactive_emoji.dart';
 import 'package:ai_assistant/screens/voice_call_screen.dart';
 import 'dart:convert';
 import 'dart:async';
@@ -39,6 +40,9 @@ class _ChatScreenState extends State<ChatScreen> {
   MiniMaxService? _minimaxService; // 保持MiniMaxService实例
   Timer? _connectionCheckTimer; // 添加定时器检查连接状态
   Timer? _autoReconnectTimer; // 自动重连定时器
+  Timer? _emojiSpeakingFallbackTimer;
+  bool _isInteractiveEmojiMode = false;
+  InteractiveEmojiState _emojiState = InteractiveEmojiState.waiting;
 
   // 语音输入相关
   bool _isVoiceInputMode = false;
@@ -163,6 +167,7 @@ class _ChatScreenState extends State<ChatScreen> {
     _connectionCheckTimer?.cancel();
     _autoReconnectTimer?.cancel();
     _waveAnimationTimer?.cancel();
+    _emojiSpeakingFallbackTimer?.cancel();
 
     // 在销毁前确保停止所有音频播放
     if (_xiaozhiService != null) {
@@ -208,6 +213,8 @@ class _ChatScreenState extends State<ChatScreen> {
     );
 
     if (event.type == XiaozhiServiceEventType.textMessage) {
+      _setEmojiState(InteractiveEmojiState.speaking);
+      _scheduleEmojiWaitingFallback();
       // 直接使用文本内容
       String content = event.data as String;
       print('收到消息内容: $content');
@@ -227,6 +234,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
       // 只有在语音输入模式下才添加用户消息
       if (content.isNotEmpty && _isVoiceInputMode) {
+        _setEmojiState(InteractiveEmojiState.thinking);
         // 语音消息可能有延迟，使用Future.microtask确保UI已更新
         Future.microtask(() {
           conversationProvider.addMessage(
@@ -236,11 +244,35 @@ class _ChatScreenState extends State<ChatScreen> {
           );
         });
       }
+    } else if (event.type == XiaozhiServiceEventType.voiceCallStart) {
+      _setEmojiState(InteractiveEmojiState.speaking);
+      _scheduleEmojiWaitingFallback();
+    } else if (event.type == XiaozhiServiceEventType.voiceCallEnd) {
+      _emojiSpeakingFallbackTimer?.cancel();
+      _emojiSpeakingFallbackTimer = Timer(
+        const Duration(milliseconds: 650),
+        () => _setEmojiState(InteractiveEmojiState.waiting),
+      );
+    } else if (event.type == XiaozhiServiceEventType.error) {
+      _emojiSpeakingFallbackTimer?.cancel();
+      _setEmojiState(InteractiveEmojiState.waiting);
     } else if (event.type == XiaozhiServiceEventType.connected ||
         event.type == XiaozhiServiceEventType.disconnected) {
       // 当连接状态发生变化时，更新UI
       setState(() {});
     }
+  }
+
+  void _setEmojiState(InteractiveEmojiState state) {
+    if (!mounted || _emojiState == state) return;
+    setState(() => _emojiState = state);
+  }
+
+  void _scheduleEmojiWaitingFallback() {
+    _emojiSpeakingFallbackTimer?.cancel();
+    _emojiSpeakingFallbackTimer = Timer(const Duration(seconds: 20), () {
+      _setEmojiState(InteractiveEmojiState.waiting);
+    });
   }
 
   // 初始化 DifyService
@@ -327,6 +359,22 @@ class _ChatScreenState extends State<ChatScreen> {
               icon: const Icon(Icons.refresh, color: Colors.black, size: 24),
               tooltip: '开始新对话',
               onPressed: _resetConversation,
+            ),
+          if (widget.conversation.type == ConversationType.xiaozhi)
+            IconButton(
+              icon: Icon(
+                _isInteractiveEmojiMode
+                    ? Icons.chat_bubble_outline_rounded
+                    : Icons.emoji_emotions_outlined,
+                color: Colors.black,
+                size: 24,
+              ),
+              tooltip: _isInteractiveEmojiMode ? '切换到消息模式' : '互动大表情',
+              onPressed: () {
+                setState(() {
+                  _isInteractiveEmojiMode = !_isInteractiveEmojiMode;
+                });
+              },
             ),
           if (widget.conversation.type == ConversationType.xiaozhi)
             Container(
@@ -537,9 +585,54 @@ class _ChatScreenState extends State<ChatScreen> {
         children: [
           if (widget.conversation.type == ConversationType.xiaozhi)
             _buildXiaozhiInfo(),
-          Expanded(child: _buildMessageList()),
+          Expanded(
+            child:
+                _isInteractiveEmojiMode &&
+                        widget.conversation.type == ConversationType.xiaozhi
+                    ? _buildInteractiveEmojiMode()
+                    : _buildMessageList(),
+          ),
           _buildInputArea(),
         ],
+      ),
+    );
+  }
+
+  Widget _buildInteractiveEmojiMode() {
+    final (label, detail) = switch (_emojiState) {
+      InteractiveEmojiState.waiting => ('我在听', '可以按住说话，也可以切换键盘输入'),
+      InteractiveEmojiState.thinking => ('让我想一想', '正在理解你的问题'),
+      InteractiveEmojiState.speaking => ('正在回答', '小智正在和你说话'),
+    };
+
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 320),
+      child: Center(
+        key: ValueKey(_emojiState),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              InteractiveEmoji(state: _emojiState, size: 286),
+              const SizedBox(height: 22),
+              Text(
+                label,
+                style: const TextStyle(
+                  color: Color(0xFF24212B),
+                  fontSize: 24,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                detail,
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -1077,6 +1170,7 @@ class _ChatScreenState extends State<ChatScreen> {
       setState(() {
         _isLoading = true;
         _isRecording = false;
+        _emojiState = InteractiveEmojiState.thinking;
         // 不要立即关闭语音输入模式，让用户可以看到识别结果
         // _isVoiceInputMode = false;
       });
@@ -1108,6 +1202,7 @@ class _ChatScreenState extends State<ChatScreen> {
     try {
       setState(() {
         _isRecording = false;
+        _emojiState = InteractiveEmojiState.waiting;
       });
 
       // 震动反馈
@@ -1212,6 +1307,9 @@ class _ChatScreenState extends State<ChatScreen> {
 
     setState(() {
       _isLoading = true;
+      if (widget.conversation.type == ConversationType.xiaozhi) {
+        _emojiState = InteractiveEmojiState.thinking;
+      }
     });
 
     _scrollToBottom();
@@ -1294,6 +1392,8 @@ class _ChatScreenState extends State<ChatScreen> {
       print('聊天屏幕: 发送消息错误: $e');
 
       if (!mounted) return;
+
+      _setEmojiState(InteractiveEmojiState.waiting);
 
       // Add error message
       await conversationProvider.addMessage(

@@ -11,6 +11,14 @@ rootProject.layout.buildDirectory.value(newBuildDir)
 subprojects {
     val newSubprojectBuildDir: Directory = newBuildDir.dir(project.name)
     project.layout.buildDirectory.value(newSubprojectBuildDir)
+
+    if (name == "flutter_pcm_player") {
+        pluginManager.withPlugin("com.android.library") {
+            extensions.configure<com.android.build.gradle.LibraryExtension> {
+                namespace = "com.example.flutter_pcm_player"
+            }
+        }
+    }
 }
 subprojects {
     project.evaluationDependsOn(":app")

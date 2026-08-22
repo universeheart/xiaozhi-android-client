@@ -621,9 +621,16 @@ class XiaozhiService {
           final String text = jsonData['text'] ?? '';
 
           if (state == 'sentence_start' && text.isNotEmpty) {
+            _dispatchEvent(
+              XiaozhiServiceEvent(XiaozhiServiceEventType.voiceCallStart, null),
+            );
             print('$TAG: 收到TTS句子: $text');
             _dispatchEvent(
               XiaozhiServiceEvent(XiaozhiServiceEventType.textMessage, text),
+            );
+          } else if (state == 'stop') {
+            _dispatchEvent(
+              XiaozhiServiceEvent(XiaozhiServiceEventType.voiceCallEnd, null),
             );
           }
           break;
