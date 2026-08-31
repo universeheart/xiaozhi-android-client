@@ -188,7 +188,7 @@ class _ChatScreenState extends State<ChatScreen> {
     _xiaozhiService = XiaozhiService(
       websocketUrl: xiaozhiConfig.websocketUrl,
       macAddress: xiaozhiConfig.macAddress,
-      token: xiaozhiConfig.token,
+      enableAutoAuth: xiaozhiConfig.enableAutoAuth,
     );
 
     // 添加消息监听器
@@ -282,10 +282,9 @@ class _ChatScreenState extends State<ChatScreen> {
     DifyConfig? difyConfig;
 
     if (configId != null && configId.isNotEmpty) {
-      difyConfig =
-          configProvider.difyConfigs
-              .where((config) => config.id == configId)
-              .firstOrNull;
+      difyConfig = configProvider.difyConfigs
+          .where((config) => config.id == configId)
+          .firstOrNull;
     }
 
     if (difyConfig == null) {
@@ -308,10 +307,9 @@ class _ChatScreenState extends State<ChatScreen> {
     MiniMaxConfig? minimaxConfig;
 
     if (configId != null && configId.isNotEmpty) {
-      minimaxConfig =
-          configProvider.minimaxConfigs
-              .where((config) => config.id == configId)
-              .firstOrNull;
+      minimaxConfig = configProvider.minimaxConfigs
+          .where((config) => config.id == configId)
+          .firstOrNull;
     }
 
     if (minimaxConfig == null) {
@@ -417,180 +415,176 @@ class _ChatScreenState extends State<ChatScreen> {
             Navigator.of(context).pop();
           },
         ),
-        title:
-            widget.conversation.type == ConversationType.xiaozhi
-                ? Row(
-                  children: [
-                    Container(
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.grey.withOpacity(0.3),
-                            blurRadius: 8,
-                            spreadRadius: 0,
-                            offset: const Offset(0, 3),
-                          ),
-                        ],
-                      ),
-                      child: CircleAvatar(
-                        radius: 20,
-                        backgroundColor: Colors.grey.shade700,
-                        child: const Icon(
-                          Icons.mic,
-                          color: Colors.white,
-                          size: 22,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          widget.conversation.title,
-                          style: const TextStyle(
-                            color: Colors.black,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 18,
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.grey.shade200,
-                            borderRadius: BorderRadius.circular(10),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.03),
-                                blurRadius: 1,
-                                spreadRadius: 0,
-                                offset: const Offset(0, 1),
-                              ),
-                            ],
-                          ),
-                          child: const Text(
-                            '语音',
-                            style: TextStyle(color: Colors.grey, fontSize: 12),
-                          ),
+        title: widget.conversation.type == ConversationType.xiaozhi
+            ? Row(
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.grey.withOpacity(0.3),
+                          blurRadius: 8,
+                          spreadRadius: 0,
+                          offset: const Offset(0, 3),
                         ),
                       ],
                     ),
-                  ],
-                )
-                : Consumer<ConfigProvider>(
-                  builder: (context, configProvider, child) {
-                    final String? configId = widget.conversation.configId;
-                    String configName = widget.conversation.title;
-                    final bool isMinimax =
-                        widget.conversation.type == ConversationType.minimax;
-                    final MaterialColor themeColor =
-                        isMinimax ? Colors.teal : Colors.blue;
-
-                    // 查找此会话对应的配置
-                    if (configId != null && configId.isNotEmpty) {
-                      if (isMinimax) {
-                        final minimaxConfig =
-                            configProvider.minimaxConfigs
-                                .where((config) => config.id == configId)
-                                .firstOrNull;
-                        if (minimaxConfig != null) {
-                          configName = minimaxConfig.name;
-                        }
-                      } else {
-                        final difyConfig =
-                            configProvider.difyConfigs
-                                .where((config) => config.id == configId)
-                                .firstOrNull;
-                        if (difyConfig != null) {
-                          configName = difyConfig.name;
-                        }
-                      }
-                    }
-
-                    return Row(
-                      children: [
-                        Container(
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: themeColor.withOpacity(0.3),
-                                blurRadius: 8,
-                                spreadRadius: 0,
-                                offset: const Offset(0, 3),
-                              ),
-                            ],
-                          ),
-                          child: CircleAvatar(
-                            radius: 20,
-                            backgroundColor: themeColor.shade400,
-                            child: Icon(
-                              isMinimax
-                                  ? Icons.auto_awesome
-                                  : Icons.chat_bubble_outline,
-                              color: Colors.white,
-                              size: 20,
-                            ),
-                          ),
+                    child: CircleAvatar(
+                      radius: 20,
+                      backgroundColor: Colors.grey.shade700,
+                      child: const Icon(
+                        Icons.mic,
+                        color: Colors.white,
+                        size: 22,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.conversation.title,
+                        style: const TextStyle(
+                          color: Colors.black,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
                         ),
-                        const SizedBox(width: 12),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              configName,
-                              style: const TextStyle(
-                                color: Colors.black,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 18,
-                              ),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: themeColor.shade50,
-                                borderRadius: BorderRadius.circular(10),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.03),
-                                    blurRadius: 1,
-                                    spreadRadius: 0,
-                                    offset: const Offset(0, 1),
-                                  ),
-                                ],
-                              ),
-                              child: Text(
-                                isMinimax ? 'MiniMax' : '文本',
-                                style: TextStyle(
-                                  color: themeColor,
-                                  fontSize: 12,
-                                ),
-                              ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade200,
+                          borderRadius: BorderRadius.circular(10),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.03),
+                              blurRadius: 1,
+                              spreadRadius: 0,
+                              offset: const Offset(0, 1),
                             ),
                           ],
                         ),
-                      ],
-                    );
-                  },
-                ),
+                        child: const Text(
+                          '语音',
+                          style: TextStyle(color: Colors.grey, fontSize: 12),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              )
+            : Consumer<ConfigProvider>(
+                builder: (context, configProvider, child) {
+                  final String? configId = widget.conversation.configId;
+                  String configName = widget.conversation.title;
+                  final bool isMinimax =
+                      widget.conversation.type == ConversationType.minimax;
+                  final MaterialColor themeColor =
+                      isMinimax ? Colors.teal : Colors.blue;
+
+                  // 查找此会话对应的配置
+                  if (configId != null && configId.isNotEmpty) {
+                    if (isMinimax) {
+                      final minimaxConfig = configProvider.minimaxConfigs
+                          .where((config) => config.id == configId)
+                          .firstOrNull;
+                      if (minimaxConfig != null) {
+                        configName = minimaxConfig.name;
+                      }
+                    } else {
+                      final difyConfig = configProvider.difyConfigs
+                          .where((config) => config.id == configId)
+                          .firstOrNull;
+                      if (difyConfig != null) {
+                        configName = difyConfig.name;
+                      }
+                    }
+                  }
+
+                  return Row(
+                    children: [
+                      Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: themeColor.withOpacity(0.3),
+                              blurRadius: 8,
+                              spreadRadius: 0,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: CircleAvatar(
+                          radius: 20,
+                          backgroundColor: themeColor.shade400,
+                          child: Icon(
+                            isMinimax
+                                ? Icons.auto_awesome
+                                : Icons.chat_bubble_outline,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            configName,
+                            style: const TextStyle(
+                              color: Colors.black,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 18,
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: themeColor.shade50,
+                              borderRadius: BorderRadius.circular(10),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.03),
+                                  blurRadius: 1,
+                                  spreadRadius: 0,
+                                  offset: const Offset(0, 1),
+                                ),
+                              ],
+                            ),
+                            child: Text(
+                              isMinimax ? 'MiniMax' : '文本',
+                              style: TextStyle(
+                                color: themeColor,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  );
+                },
+              ),
       ),
       body: Column(
         children: [
           if (widget.conversation.type == ConversationType.xiaozhi)
             _buildXiaozhiInfo(),
           Expanded(
-            child:
-                _isInteractiveEmojiMode &&
-                        widget.conversation.type == ConversationType.xiaozhi
-                    ? _buildInteractiveEmojiMode()
-                    : _buildMessageList(),
+            child: _isInteractiveEmojiMode &&
+                    widget.conversation.type == ConversationType.xiaozhi
+                ? _buildInteractiveEmojiMode()
+                : _buildMessageList(),
           ),
           _buildInputArea(),
         ],
@@ -641,14 +635,13 @@ class _ChatScreenState extends State<ChatScreen> {
     final configProvider = Provider.of<ConfigProvider>(context);
     final xiaozhiConfig = configProvider.xiaozhiConfigs.firstWhere(
       (config) => config.id == widget.conversation.configId,
-      orElse:
-          () => XiaozhiConfig(
-            id: '',
-            name: '未知服务',
-            websocketUrl: '',
-            macAddress: '',
-            token: '',
-          ),
+      orElse: () => XiaozhiConfig(
+        id: '',
+        name: '未知服务',
+        websocketUrl: '',
+        macAddress: '',
+        token: '',
+      ),
     );
 
     final bool isConnected = _xiaozhiService?.isConnected ?? false;
@@ -1016,12 +1009,11 @@ class _ChatScreenState extends State<ChatScreen> {
               child: Container(
                 height: 54,
                 decoration: BoxDecoration(
-                  color:
-                      _isRecording
-                          ? _isCancelling
-                              ? Colors.red.shade50
-                              : Colors.blue.shade50
-                          : const Color(0xFFF5F7F9),
+                  color: _isRecording
+                      ? _isCancelling
+                          ? Colors.red.shade50
+                          : Colors.blue.shade50
+                      : const Color(0xFFF5F7F9),
                   borderRadius: BorderRadius.circular(24),
                   boxShadow: [
                     BoxShadow(
@@ -1048,17 +1040,15 @@ class _ChatScreenState extends State<ChatScreen> {
                                 : "松开发送，上滑取消"
                             : "按住说话",
                         style: TextStyle(
-                          color:
-                              _isRecording
-                                  ? _isCancelling
-                                      ? Colors.red
-                                      : Colors.blue.shade700
-                                  : const Color.fromARGB(255, 9, 9, 9),
+                          color: _isRecording
+                              ? _isCancelling
+                                  ? Colors.red
+                                  : Colors.blue.shade700
+                              : const Color.fromARGB(255, 9, 9, 9),
                           fontSize: 16,
-                          fontWeight:
-                              _isRecording
-                                  ? FontWeight.w500
-                                  : FontWeight.normal,
+                          fontWeight: _isRecording
+                              ? FontWeight.w500
+                              : FontWeight.normal,
                         ),
                       ),
                     ),
@@ -1438,11 +1428,10 @@ class _ChatScreenState extends State<ChatScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder:
-            (context) => VoiceCallScreen(
-              conversation: widget.conversation,
-              xiaozhiConfig: xiaozhiConfig,
-            ),
+        builder: (context) => VoiceCallScreen(
+          conversation: widget.conversation,
+          xiaozhiConfig: xiaozhiConfig,
+        ),
       ),
     ).then((_) {
       // 页面返回后，确保重新初始化服务以恢复正常对话功能

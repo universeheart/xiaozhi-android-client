@@ -76,7 +76,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
     _xiaozhiService = XiaozhiService(
       websocketUrl: widget.xiaozhiConfig.websocketUrl,
       macAddress: widget.xiaozhiConfig.macAddress,
-      token: widget.xiaozhiConfig.token,
+      enableAutoAuth: widget.xiaozhiConfig.enableAutoAuth,
       sessionId: widget.conversation.id,
     );
 
@@ -215,32 +215,29 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
 
       try {
         // 开始录音并订阅音频流
-        _xiaozhiService
-            .startListeningCall()
-            .then((_) {
-              if (mounted) {
-                _showCustomSnackbar(
-                  message: '正在录音...',
-                  icon: Icons.mic,
-                  iconColor: Colors.greenAccent,
-                );
-              }
-            })
-            .catchError((e) {
-              print('开始录音失败: $e');
-              // 如果失败，恢复状态
-              if (mounted) {
-                setState(() {
-                  _isSpeaking = false;
-                });
-
-                _showCustomSnackbar(
-                  message: '开始录音失败: $e',
-                  icon: Icons.error,
-                  iconColor: Colors.redAccent,
-                );
-              }
+        _xiaozhiService.startListeningCall().then((_) {
+          if (mounted) {
+            _showCustomSnackbar(
+              message: '正在录音...',
+              icon: Icons.mic,
+              iconColor: Colors.greenAccent,
+            );
+          }
+        }).catchError((e) {
+          print('开始录音失败: $e');
+          // 如果失败，恢复状态
+          if (mounted) {
+            setState(() {
+              _isSpeaking = false;
             });
+
+            _showCustomSnackbar(
+              message: '开始录音失败: $e',
+              icon: Icons.error,
+              iconColor: Colors.redAccent,
+            );
+          }
+        });
       } catch (e) {
         print('开始录音失败: $e');
         // 如果失败，恢复状态
@@ -404,24 +401,21 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
                     vertical: 8,
                   ),
                   decoration: BoxDecoration(
-                    color:
-                        _isConnected
-                            ? Colors.green.withOpacity(0.2)
-                            : Colors.red.withOpacity(0.2),
+                    color: _isConnected
+                        ? Colors.green.withOpacity(0.2)
+                        : Colors.red.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                      color:
-                          _isConnected
-                              ? Colors.green.withOpacity(0.6)
-                              : Colors.red.withOpacity(0.6),
+                      color: _isConnected
+                          ? Colors.green.withOpacity(0.6)
+                          : Colors.red.withOpacity(0.6),
                       width: 1,
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color:
-                            _isConnected
-                                ? Colors.green.withOpacity(0.2)
-                                : Colors.red.withOpacity(0.2),
+                        color: _isConnected
+                            ? Colors.green.withOpacity(0.2)
+                            : Colors.red.withOpacity(0.2),
                         blurRadius: 8,
                         spreadRadius: 0,
                       ),
@@ -535,7 +529,8 @@ class _VoiceCallScreenState extends State<VoiceCallScreen>
         Colors.blue.shade400,
         Colors.green.shade400,
         position,
-      )!.withOpacity(0.7 + 0.3 * level);
+      )!
+          .withOpacity(0.7 + 0.3 * level);
     } else {
       // 非说话状态时使用柔和的蓝色
       return Colors.blue.shade200.withOpacity(0.3 + 0.4 * level);

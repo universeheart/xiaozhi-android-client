@@ -31,24 +31,21 @@ class ConfigProvider extends ChangeNotifier {
 
     // Load Xiaozhi configs
     final xiaozhiConfigsJson = prefs.getStringList('xiaozhiConfigs') ?? [];
-    _xiaozhiConfigs =
-        xiaozhiConfigsJson
-            .map((json) => XiaozhiConfig.fromJson(jsonDecode(json)))
-            .toList();
+    _xiaozhiConfigs = xiaozhiConfigsJson
+        .map((json) => XiaozhiConfig.fromJson(jsonDecode(json)))
+        .toList();
 
     // 加载多个Dify配置
     final difyConfigsJson = prefs.getStringList('difyConfigs') ?? [];
-    _difyConfigs =
-        difyConfigsJson
-            .map((json) => DifyConfig.fromJson(jsonDecode(json)))
-            .toList();
+    _difyConfigs = difyConfigsJson
+        .map((json) => DifyConfig.fromJson(jsonDecode(json)))
+        .toList();
 
     // Load MiniMax configs
     final minimaxConfigsJson = prefs.getStringList('minimaxConfigs') ?? [];
-    _minimaxConfigs =
-        minimaxConfigsJson
-            .map((json) => MiniMaxConfig.fromJson(jsonDecode(json)))
-            .toList();
+    _minimaxConfigs = minimaxConfigsJson
+        .map((json) => MiniMaxConfig.fromJson(jsonDecode(json)))
+        .toList();
 
     // 向后兼容：加载旧版单个Dify配置
     final oldDifyConfigJson = prefs.getString('difyConfig');
@@ -95,6 +92,7 @@ class ConfigProvider extends ChangeNotifier {
     String name,
     String websocketUrl, {
     String? customMacAddress,
+    bool enableAutoAuth = false,
   }) async {
     // 如果提供了自定义MAC地址，直接使用；否则使用设备ID生成
     final macAddress = customMacAddress ?? await _getDeviceMacAddress();
@@ -104,7 +102,8 @@ class ConfigProvider extends ChangeNotifier {
       name: name,
       websocketUrl: websocketUrl,
       macAddress: macAddress,
-      token: 'test-token',
+      token: '',
+      enableAutoAuth: enableAutoAuth,
     );
 
     _xiaozhiConfigs.add(newConfig);
