@@ -1,13 +1,24 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:flutter/foundation.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:web_socket_channel/status.dart' as status;
+import 'xiaozhi_connection_state_machine.dart';
+import 'xiaozhi_reconnect_controller.dart';
 // 尝试导入io.dart，但在web平台会抛出异常
 import 'package:web_socket_channel/io.dart'
     if (dart.library.html) 'package:web_socket_channel/html.dart';
 
 /// 小智WebSocket事件类型
-enum XiaozhiEventType { connected, disconnected, message, error, binaryMessage }
+enum XiaozhiEventType {
+  connected,
+  disconnected,
+  stateChanged,
+  message,
+  error,
+  binaryMessage,
+}
 
 /// 小智WebSocket事件
 class XiaozhiEvent {
@@ -23,7 +34,6 @@ typedef XiaozhiWebSocketListener = void Function(XiaozhiEvent event);
 /// 小智WebSocket管理器
 class XiaozhiWebSocketManager {
   static const String TAG = "XiaozhiWebSocket";
-  static const int RECONNECT_DELAY = 3000; // 3秒后重连
 
   WebSocketChannel? _channel;
   String? _serverUrl;
@@ -31,26 +41,83 @@ class XiaozhiWebSocketManager {
   String? _clientId;
   String? _token;
   bool _enableToken;
+  final Connectivity _connectivity;
 
   final List<XiaozhiWebSocketListener> _listeners = [];
-  bool _isReconnecting = false;
-  bool _shouldReconnect = false;
-  Timer? _reconnectTimer;
   StreamSubscription? _streamSubscription;
-  final Future<void> Function()? _onReconnect;
-  Completer<void>? _authenticationCompleter;
-  bool _isAuthenticated = false;
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
+  bool _connectInProgress = false;
+  int _connectionGeneration = 0;
+  late final XiaozhiConnectionStateMachine _connectionStateMachine;
+  late final XiaozhiReconnectController _reconnectController;
 
   /// 构造函数
   XiaozhiWebSocketManager({
     required String deviceId,
-    required String clientId,
+    String? clientId,
     bool enableToken = false,
-    Future<void> Function()? onReconnect,
-  })  : _deviceId = deviceId,
-        _clientId = clientId,
-        _enableToken = enableToken,
-        _onReconnect = onReconnect;
+    Duration handshakeTimeout = const Duration(seconds: 10),
+    HandshakeTimerFactory? handshakeTimerFactory,
+    ReconnectTimerFactory? reconnectTimerFactory,
+    double Function()? reconnectRandomUnit,
+    Connectivity? connectivity,
+  }) : _deviceId = deviceId,
+       _clientId = clientId ?? deviceId,
+       _enableToken = enableToken,
+       _connectivity = connectivity ?? Connectivity() {
+    _reconnectController = XiaozhiReconnectController(
+      timerFactory: reconnectTimerFactory,
+      randomUnit: reconnectRandomUnit,
+      onReconnect: () => unawaited(_connectWithSavedParameters()),
+    );
+    _connectionStateMachine = XiaozhiConnectionStateMachine(
+      handshakeTimeout: handshakeTimeout,
+      timerFactory: handshakeTimerFactory,
+      onStateChanged: (state) {
+        _dispatchEvent(
+          XiaozhiEvent(type: XiaozhiEventType.stateChanged, data: state),
+        );
+        if (state == XiaozhiConnectionState.ready) {
+          _reconnectController.markReady();
+          _dispatchEvent(
+            XiaozhiEvent(type: XiaozhiEventType.connected, data: null),
+          );
+        }
+      },
+      onHandshakeTimeout: () => unawaited(_onHandshakeTimeout()),
+    );
+  }
+
+  @visibleForTesting
+  static Map<String, dynamic> buildConnectionHeaders({
+    required String deviceId,
+    String? clientId,
+    required bool enableToken,
+    required String token,
+  }) {
+    final headers = <String, dynamic>{
+      'device-id': deviceId,
+      'client-id': clientId ?? deviceId,
+      'protocol-version': '1',
+    };
+
+    if (enableToken && token.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $token';
+    }
+
+    return headers;
+  }
+
+  @visibleForTesting
+  static String? buildFallbackAuthMessage({
+    required bool enableToken,
+    required String token,
+  }) {
+    if (!enableToken || token.isEmpty) {
+      return null;
+    }
+    return 'Authorization: Bearer $token';
+  }
 
   /// 添加事件监听器
   void addListener(XiaozhiWebSocketListener listener) {
@@ -66,7 +133,7 @@ class XiaozhiWebSocketManager {
 
   /// 分发事件到所有监听器
   void _dispatchEvent(XiaozhiEvent event) {
-    for (var listener in _listeners) {
+    for (final listener in List<XiaozhiWebSocketListener>.of(_listeners)) {
       listener(event);
     }
   }
@@ -80,40 +147,118 @@ class XiaozhiWebSocketManager {
       return;
     }
 
-    // 如果已连接，先断开
-    if (_channel != null) {
-      await disconnect();
-    }
-
     // 保存连接参数
     _serverUrl = url;
     _token = token;
-    _shouldReconnect = true;
-    _isAuthenticated = false;
-    _authenticationCompleter = Completer<void>();
+    _reconnectController.start();
+    _reconnectController.resetBackoff();
+    await _ensureConnectivityMonitoring();
+
+    if (!_reconnectController.networkAvailable) {
+      _connectionStateMachine.goOffline();
+      return;
+    }
+
+    await _connectWithSavedParameters();
+  }
+
+  Future<void> reconnect() async {
+    if (_serverUrl == null || _token == null) {
+      _dispatchEvent(
+        XiaozhiEvent(type: XiaozhiEventType.error, data: '没有可用的重连参数'),
+      );
+      return;
+    }
+
+    _reconnectController.start();
+    await _ensureConnectivityMonitoring();
+    _reconnectController.resetBackoff();
+    await _connectWithSavedParameters();
+  }
+
+  Future<void> waitUntilReady({
+    Duration timeout = const Duration(seconds: 12),
+  }) async {
+    if (isConnected) {
+      return;
+    }
+
+    final completer = Completer<void>();
+    late XiaozhiWebSocketListener listener;
+    Timer? timeoutTimer;
+
+    void cleanup() {
+      timeoutTimer?.cancel();
+      removeListener(listener);
+    }
+
+    listener = (event) {
+      if (event.type == XiaozhiEventType.connected && !completer.isCompleted) {
+        cleanup();
+        completer.complete();
+      }
+    };
+    addListener(listener);
+
+    if (isConnected) {
+      cleanup();
+      return;
+    }
+
+    timeoutTimer = Timer(timeout, () {
+      if (!completer.isCompleted) {
+        cleanup();
+        completer.completeError(
+          TimeoutException('等待 WebSocket 服务就绪超时', timeout),
+        );
+      }
+    });
+
+    await completer.future;
+  }
+
+  Future<void> _connectWithSavedParameters() async {
+    if (_connectInProgress ||
+        !_reconnectController.isActive ||
+        !_reconnectController.networkAvailable ||
+        _serverUrl == null ||
+        _token == null) {
+      return;
+    }
+
+    _connectInProgress = true;
+    try {
+      await _connectInternal(_serverUrl!, _token!);
+    } finally {
+      _connectInProgress = false;
+    }
+  }
+
+  Future<void> _connectInternal(String url, String token) async {
+    await _closeCurrentChannel(status.normalClosure);
+    if (!_reconnectController.isActive ||
+        !_reconnectController.networkAvailable) {
+      return;
+    }
+    final generation = _connectionGeneration;
+
+    _connectionStateMachine.beginConnecting();
 
     try {
       // 创建WebSocket连接
       Uri uri = Uri.parse(url);
 
       print('$TAG: 正在连接 $url');
-      print('$TAG: 设备ID: $_deviceId');
       print('$TAG: Token启用: $_enableToken');
 
       // 尝试使用headers (这在非Web平台上有效)
       try {
-        // 创建headers
-        Map<String, dynamic> headers = {
-          'device-id': _deviceId ?? '',
-          'client-id': _clientId ?? '',
-          'protocol-version': '1',
-        };
-
-        // 添加Authorization头，参考Java实现
-        if (_enableToken && token.isNotEmpty) {
-          headers['Authorization'] = 'Bearer $token';
-          print('$TAG: 已添加Authorization头');
-        }
+        final headers = buildConnectionHeaders(
+          deviceId: _deviceId ?? '',
+          clientId: _clientId,
+          enableToken: _enableToken,
+          token: token,
+        );
 
         // 使用IOWebSocketChannel并传递headers
         _channel = IOWebSocketChannel.connect(uri, headers: headers);
@@ -128,22 +273,28 @@ class XiaozhiWebSocketManager {
 
         // 在连接成功后作为第一条消息发送认证信息
         Timer(Duration(milliseconds: 100), () {
-          if (_channel != null) {
-            // 发送认证信息作为第一条消息
-            if (_enableToken && token.isNotEmpty) {
-              _channel!.sink.add('Authorization: Bearer $token');
+          if (generation == _connectionGeneration &&
+              _channel != null &&
+              _connectionStateMachine.state ==
+                  XiaozhiConnectionState.handshaking) {
+            final authMessage = buildFallbackAuthMessage(
+              enableToken: _enableToken,
+              token: token,
+            );
+            if (authMessage != null) {
+              _sendRawMessage(authMessage);
               print('$TAG: 已发送认证消息');
             }
 
             // 发送设备ID信息
             String deviceIdMessage = 'Device-ID: $_deviceId';
-            _channel!.sink.add(deviceIdMessage);
-            print('$TAG: 发送设备ID消息: $deviceIdMessage');
+            _sendRawMessage(deviceIdMessage);
+            print('$TAG: 已发送设备ID消息');
           }
         });
       }
 
-      // 先监听流，避免握手失败事件无人接收。
+      // 监听WebSocket事件
       _streamSubscription = _channel!.stream.listen(
         _onMessage,
         onDone: _onDisconnected,
@@ -151,42 +302,55 @@ class XiaozhiWebSocketManager {
         cancelOnError: false,
       );
 
-      // connect() 只创建通道；ready 完成才表示 HTTP/WebSocket 握手成功。
-      await _channel!.ready;
+      // 通道创建只代表可以开始协议握手；收到服务端 hello 后才 READY。
+      _connectionStateMachine.beginHandshake();
 
-      _sendHelloMessage();
-      print('$TAG: WebSocket握手成功，等待服务器认证');
+      // 在发送认证信息之后发送Hello消息
+      Timer(Duration(milliseconds: 200), () {
+        if (generation == _connectionGeneration) {
+          _sendHelloMessage();
+        }
+      });
 
-      await _authenticationCompleter!.future.timeout(
-        const Duration(seconds: 10),
-        onTimeout: () => throw TimeoutException('等待服务器 hello 响应超时'),
-      );
-      print('$TAG: 服务器认证成功，已连接到 $uri');
+      print('$TAG: 已连接到 $uri');
     } catch (e) {
       print('$TAG: 连接失败: $e');
+      _connectionStateMachine.goOffline();
       _dispatchEvent(
         XiaozhiEvent(type: XiaozhiEventType.error, data: "创建WebSocket失败: $e"),
       );
-      rethrow;
+      _reconnectController.scheduleAfterFailure();
     }
   }
 
   /// 断开WebSocket连接
   Future<void> disconnect() async {
-    // 取消重连
-    _shouldReconnect = false;
-    _reconnectTimer?.cancel();
-    _isReconnecting = false;
-    _isAuthenticated = false;
+    _reconnectController.stop();
+    _connectionStateMachine.goOffline();
+    await _connectivitySubscription?.cancel();
+    _connectivitySubscription = null;
+    await _closeCurrentChannel(status.normalClosure);
+  }
 
-    // 取消订阅
-    await _streamSubscription?.cancel();
+  Future<void> _closeCurrentChannel(int closeCode) async {
+    _connectionGeneration++;
+    final subscription = _streamSubscription;
     _streamSubscription = null;
+    final channel = _channel;
+    _channel = null;
 
-    // 关闭连接
-    if (_channel != null) {
-      await _channel!.sink.close(status.normalClosure);
-      _channel = null;
+    try {
+      await subscription?.cancel().timeout(const Duration(seconds: 2));
+    } catch (error) {
+      print('$TAG: 取消旧连接监听超时或失败: $error');
+    }
+
+    if (channel != null) {
+      try {
+        await channel.sink.close(closeCode).timeout(const Duration(seconds: 2));
+      } catch (error) {
+        print('$TAG: 关闭旧连接超时或失败: $error');
+      }
       print('$TAG: 连接已断开');
     }
   }
@@ -205,7 +369,14 @@ class XiaozhiWebSocketManager {
       },
     };
 
-    _channel?.sink.add(jsonEncode(hello));
+    _sendRawMessage(jsonEncode(hello));
+  }
+
+  void _sendRawMessage(dynamic message) {
+    if (_channel != null &&
+        _connectionStateMachine.state != XiaozhiConnectionState.offline) {
+      _channel!.sink.add(message);
+    }
   }
 
   /// 发送文本消息
@@ -220,14 +391,6 @@ class XiaozhiWebSocketManager {
   /// 发送二进制数据
   void sendBinaryMessage(List<int> data) {
     if (_channel != null && isConnected) {
-      // 调试：打印前20个字节的十六进制表示
-      if (data.length > 0) {
-        String hexData = '';
-        for (int i = 0; i < data.length && i < 20; i++) {
-          hexData += '${data[i].toRadixString(16).padLeft(2, '0')} ';
-        }
-      }
-
       try {
         _channel!.sink.add(data);
       } catch (e) {
@@ -254,7 +417,7 @@ class XiaozhiWebSocketManager {
         "source": "text",
       };
 
-      print('$TAG: 发送文本请求: ${jsonEncode(jsonMessage)}');
+      print('$TAG: 发送文本请求');
       sendMessage(jsonEncode(jsonMessage));
     } catch (e) {
       print('$TAG: 发送文本请求失败: $e');
@@ -264,38 +427,9 @@ class XiaozhiWebSocketManager {
   /// 处理收到的消息
   void _onMessage(dynamic message) {
     if (message is String) {
-      if (message.contains('认证失败') ||
-          message.toLowerCase().contains('authentication failed') ||
-          message.toLowerCase().contains('unauthorized')) {
-        const errorMessage = 'WebSocket认证失败';
-        if (!(_authenticationCompleter?.isCompleted ?? true)) {
-          _authenticationCompleter!.completeError(Exception(errorMessage));
-        }
-        _dispatchEvent(
-          XiaozhiEvent(type: XiaozhiEventType.error, data: errorMessage),
-        );
-        return;
-      }
-
-      try {
-        final decoded = jsonDecode(message);
-        if (decoded is Map<String, dynamic> &&
-            decoded['type'] == 'hello' &&
-            !_isAuthenticated) {
-          _isAuthenticated = true;
-          if (!(_authenticationCompleter?.isCompleted ?? true)) {
-            _authenticationCompleter!.complete();
-          }
-          _dispatchEvent(
-            XiaozhiEvent(type: XiaozhiEventType.connected, data: null),
-          );
-        }
-      } on FormatException {
-        // 非 JSON 文本由上层按普通消息处理。
-      }
-
+      _connectionStateMachine.acceptServerText(message);
       // 文本消息
-      print('$TAG: 收到消息: $message');
+      print('$TAG: 收到文本消息');
       _dispatchEvent(
         XiaozhiEvent(type: XiaozhiEventType.message, data: message),
       );
@@ -307,51 +441,92 @@ class XiaozhiWebSocketManager {
     }
   }
 
+  Future<void> _ensureConnectivityMonitoring() async {
+    if (_connectivitySubscription != null) {
+      return;
+    }
+
+    try {
+      final initial = await _connectivity.checkConnectivity();
+      _reconnectController.setNetworkAvailable(_hasNetwork(initial));
+      _connectivitySubscription = _connectivity.onConnectivityChanged.listen(
+        (results) => unawaited(_handleNetworkChange(results)),
+        onError: (Object error) {
+          print('$TAG: 网络状态监听失败: $error');
+        },
+      );
+    } catch (error) {
+      // 桌面测试或未注册 connectivity_plus 插件的平台仍可直接连接；
+      // 网络失败将由 WebSocket 自身的错误与退避重连处理。
+      print('$TAG: 无法启用网络状态监听，继续直接连接: $error');
+      _reconnectController.setNetworkAvailable(true);
+    }
+  }
+
+  bool _hasNetwork(List<ConnectivityResult> results) {
+    return results.any((result) => result != ConnectivityResult.none);
+  }
+
+  Future<void> _handleNetworkChange(List<ConnectivityResult> results) async {
+    final available = _hasNetwork(results);
+    if (available == _reconnectController.networkAvailable) {
+      return;
+    }
+
+    if (!available) {
+      final wasOnline =
+          _connectionStateMachine.state != XiaozhiConnectionState.offline;
+      _reconnectController.setNetworkAvailable(false);
+      _connectionStateMachine.goOffline();
+      await _closeCurrentChannel(status.goingAway);
+      if (wasOnline) {
+        _dispatchEvent(
+          XiaozhiEvent(type: XiaozhiEventType.disconnected, data: null),
+        );
+      }
+      return;
+    }
+
+    // 网络恢复会取消旧退避、重置失败次数并立即尝试一次连接。
+    _reconnectController.setNetworkAvailable(true);
+  }
+
   /// 处理断开连接事件
   void _onDisconnected() {
     print('$TAG: 连接已断开');
-    _isAuthenticated = false;
-    if (!(_authenticationCompleter?.isCompleted ?? true)) {
-      _authenticationCompleter!.completeError(
-        Exception('服务器认证完成前连接已断开'),
-      );
-    }
+    _streamSubscription = null;
+    _channel = null;
+    _connectionStateMachine.goOffline();
     _dispatchEvent(
       XiaozhiEvent(type: XiaozhiEventType.disconnected, data: null),
     );
 
-    // 尝试自动重连
-    if (_shouldReconnect &&
-        !_isReconnecting &&
-        _serverUrl != null &&
-        _token != null) {
-      _isReconnecting = true;
-      _reconnectTimer = Timer(
-        const Duration(milliseconds: RECONNECT_DELAY),
-        () {
-          _isReconnecting = false;
-          if (_shouldReconnect) {
-            if (_onReconnect != null) {
-              _onReconnect();
-            } else if (_serverUrl != null && _token != null) {
-              connect(_serverUrl!, _token!);
-            }
-          }
-        },
-      );
-    }
+    _reconnectController.scheduleAfterFailure();
   }
 
   /// 处理错误事件
   void _onError(error) {
     print('$TAG: 错误: $error');
+    _connectionStateMachine.goOffline();
     _dispatchEvent(
       XiaozhiEvent(type: XiaozhiEventType.error, data: error.toString()),
     );
+    _reconnectController.scheduleAfterFailure();
   }
 
   /// 判断是否已连接
   bool get isConnected {
-    return _isAuthenticated && _channel != null && _streamSubscription != null;
+    return _connectionStateMachine.state == XiaozhiConnectionState.ready;
+  }
+
+  XiaozhiConnectionState get connectionState => _connectionStateMachine.state;
+
+  Future<void> _onHandshakeTimeout() async {
+    print('$TAG: WebSocket握手超时');
+    _dispatchEvent(
+      XiaozhiEvent(type: XiaozhiEventType.error, data: 'WebSocket握手超时'),
+    );
+    await _closeCurrentChannel(status.goingAway);
+    _reconnectController.scheduleAfterFailure();
   }
 }

@@ -26,6 +26,38 @@ void main() {
     });
   });
 
+  group('OTA URL resolution', () {
+    test('uses an explicitly configured OTA URL', () {
+      expect(
+        XiaozhiOtaService.resolveOtaUrl(
+          configuredOtaUrl: 'http://10.0.2.2:9000/custom/ota/',
+          websocketUrl: 'ws://10.0.2.2:8000/xiaozhi/v1/',
+        ),
+        'http://10.0.2.2:9000/custom/ota/',
+      );
+    });
+
+    test('derives local OTA port from a plain WebSocket URL', () {
+      expect(
+        XiaozhiOtaService.resolveOtaUrl(
+          configuredOtaUrl: '',
+          websocketUrl: 'ws://172.21.128.50:8000/xiaozhi/v1/',
+        ),
+        'http://172.21.128.50:8002/xiaozhi/ota/',
+      );
+    });
+
+    test('derives HTTPS OTA URL from a secure WebSocket URL', () {
+      expect(
+        XiaozhiOtaService.resolveOtaUrl(
+          configuredOtaUrl: '',
+          websocketUrl: 'wss://xiaozhi.example.com/xiaozhi/v1/',
+        ),
+        'https://xiaozhi.example.com/xiaozhi/ota/',
+      );
+    });
+  });
+
   test('legacy Xiaozhi config keeps automatic authorization disabled', () {
     final config = XiaozhiConfig.fromJson({
       'id': '1',
@@ -36,5 +68,22 @@ void main() {
     });
 
     expect(config.enableAutoAuth, isFalse);
+    expect(config.otaUrl, isEmpty);
+  });
+
+  test('Xiaozhi config persists the configurable OTA URL', () {
+    final config = XiaozhiConfig(
+      id: '1',
+      name: 'local',
+      websocketUrl: 'ws://172.21.128.50:8000/xiaozhi/v1/',
+      otaUrl: 'http://172.21.128.50:8002/xiaozhi/ota/',
+      macAddress: 'fc:0c:70:20:83:a6',
+      token: '',
+      enableAutoAuth: true,
+    );
+
+    final restored = XiaozhiConfig.fromJson(config.toJson());
+    expect(restored.otaUrl, config.otaUrl);
+    expect(restored.enableAutoAuth, isTrue);
   });
 }

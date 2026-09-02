@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:device_info_plus/device_info_plus.dart';
@@ -31,21 +30,24 @@ class ConfigProvider extends ChangeNotifier {
 
     // Load Xiaozhi configs
     final xiaozhiConfigsJson = prefs.getStringList('xiaozhiConfigs') ?? [];
-    _xiaozhiConfigs = xiaozhiConfigsJson
-        .map((json) => XiaozhiConfig.fromJson(jsonDecode(json)))
-        .toList();
+    _xiaozhiConfigs =
+        xiaozhiConfigsJson
+            .map((json) => XiaozhiConfig.fromJson(jsonDecode(json)))
+            .toList();
 
     // 加载多个Dify配置
     final difyConfigsJson = prefs.getStringList('difyConfigs') ?? [];
-    _difyConfigs = difyConfigsJson
-        .map((json) => DifyConfig.fromJson(jsonDecode(json)))
-        .toList();
+    _difyConfigs =
+        difyConfigsJson
+            .map((json) => DifyConfig.fromJson(jsonDecode(json)))
+            .toList();
 
     // Load MiniMax configs
     final minimaxConfigsJson = prefs.getStringList('minimaxConfigs') ?? [];
-    _minimaxConfigs = minimaxConfigsJson
-        .map((json) => MiniMaxConfig.fromJson(jsonDecode(json)))
-        .toList();
+    _minimaxConfigs =
+        minimaxConfigsJson
+            .map((json) => MiniMaxConfig.fromJson(jsonDecode(json)))
+            .toList();
 
     // 向后兼容：加载旧版单个Dify配置
     final oldDifyConfigJson = prefs.getString('difyConfig');
@@ -91,6 +93,7 @@ class ConfigProvider extends ChangeNotifier {
   Future<void> addXiaozhiConfig(
     String name,
     String websocketUrl, {
+    String otaUrl = '',
     String? customMacAddress,
     bool enableAutoAuth = false,
   }) async {
@@ -101,6 +104,7 @@ class ConfigProvider extends ChangeNotifier {
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       name: name,
       websocketUrl: websocketUrl,
+      otaUrl: otaUrl,
       macAddress: macAddress,
       token: '',
       enableAutoAuth: enableAutoAuth,

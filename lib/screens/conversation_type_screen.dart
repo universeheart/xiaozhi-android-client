@@ -121,10 +121,11 @@ class _ConversationTypeScreenState extends State<ConversationTypeScreen> {
               Expanded(
                 child: InkWell(
                   onTap: () {
-                    final difyConfigs = Provider.of<ConfigProvider>(
-                      context,
-                      listen: false,
-                    ).difyConfigs;
+                    final difyConfigs =
+                        Provider.of<ConfigProvider>(
+                          context,
+                          listen: false,
+                        ).difyConfigs;
 
                     if (difyConfigs.isEmpty) {
                       ScaffoldMessenger.of(context).showSnackBar(
@@ -150,14 +151,16 @@ class _ConversationTypeScreenState extends State<ConversationTypeScreen> {
                     ),
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
-                      color: _selectedType == ConversationType.dify
-                          ? const Color(0xFFF5F5F5)
-                          : Colors.white,
+                      color:
+                          _selectedType == ConversationType.dify
+                              ? const Color(0xFFF5F5F5)
+                              : Colors.white,
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                        color: _selectedType == ConversationType.dify
-                            ? Colors.black
-                            : Colors.grey.shade300,
+                        color:
+                            _selectedType == ConversationType.dify
+                                ? Colors.black
+                                : Colors.grey.shade300,
                         width: _selectedType == ConversationType.dify ? 2 : 1,
                       ),
                       boxShadow: [
@@ -223,10 +226,11 @@ class _ConversationTypeScreenState extends State<ConversationTypeScreen> {
               Expanded(
                 child: InkWell(
                   onTap: () {
-                    final xiaozhiConfigs = Provider.of<ConfigProvider>(
-                      context,
-                      listen: false,
-                    ).xiaozhiConfigs;
+                    final xiaozhiConfigs =
+                        Provider.of<ConfigProvider>(
+                          context,
+                          listen: false,
+                        ).xiaozhiConfigs;
 
                     if (xiaozhiConfigs.isEmpty) {
                       ScaffoldMessenger.of(context).showSnackBar(
@@ -240,9 +244,10 @@ class _ConversationTypeScreenState extends State<ConversationTypeScreen> {
                       _showXiaozhiSelector = true;
                       _showDifySelector = false;
                       _showMiniMaxSelector = false;
-                      _selectedXiaozhiConfig = xiaozhiConfigs.isNotEmpty
-                          ? xiaozhiConfigs.first
-                          : null;
+                      _selectedXiaozhiConfig =
+                          xiaozhiConfigs.isNotEmpty
+                              ? xiaozhiConfigs.first
+                              : null;
                     });
                   },
                   child: Container(
@@ -253,14 +258,16 @@ class _ConversationTypeScreenState extends State<ConversationTypeScreen> {
                     ),
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
-                      color: _selectedType == ConversationType.xiaozhi
-                          ? const Color(0xFFF5F5F5)
-                          : Colors.white,
+                      color:
+                          _selectedType == ConversationType.xiaozhi
+                              ? const Color(0xFFF5F5F5)
+                              : Colors.white,
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                        color: _selectedType == ConversationType.xiaozhi
-                            ? Colors.black
-                            : Colors.grey.shade300,
+                        color:
+                            _selectedType == ConversationType.xiaozhi
+                                ? Colors.black
+                                : Colors.grey.shade300,
                         width:
                             _selectedType == ConversationType.xiaozhi ? 2 : 1,
                       ),
@@ -329,10 +336,11 @@ class _ConversationTypeScreenState extends State<ConversationTypeScreen> {
           // MiniMax AI 对话选项
           InkWell(
             onTap: () {
-              final minimaxConfigs = Provider.of<ConfigProvider>(
-                context,
-                listen: false,
-              ).minimaxConfigs;
+              final minimaxConfigs =
+                  Provider.of<ConfigProvider>(
+                    context,
+                    listen: false,
+                  ).minimaxConfigs;
 
               if (minimaxConfigs.isEmpty) {
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -351,21 +359,19 @@ class _ConversationTypeScreenState extends State<ConversationTypeScreen> {
               });
             },
             child: Container(
-              margin: const EdgeInsets.only(
-                left: 20,
-                right: 20,
-                bottom: 20,
-              ),
+              margin: const EdgeInsets.only(left: 20, right: 20, bottom: 20),
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: _selectedType == ConversationType.minimax
-                    ? const Color(0xFFF5F5F5)
-                    : Colors.white,
+                color:
+                    _selectedType == ConversationType.minimax
+                        ? const Color(0xFFF5F5F5)
+                        : Colors.white,
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: _selectedType == ConversationType.minimax
-                      ? Colors.black
-                      : Colors.grey.shade300,
+                  color:
+                      _selectedType == ConversationType.minimax
+                          ? Colors.black
+                          : Colors.grey.shade300,
                   width: _selectedType == ConversationType.minimax ? 2 : 1,
                 ),
                 boxShadow: [
@@ -534,53 +540,54 @@ class _ConversationTypeScreenState extends State<ConversationTypeScreen> {
               fontWeight: FontWeight.w500,
               color: Colors.black,
             ),
-            items: configs.map((XiaozhiConfig config) {
-              return DropdownMenuItem<XiaozhiConfig>(
-                value: config,
-                child: Container(
-                  margin: const EdgeInsets.symmetric(vertical: 8.0),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.purple.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Icon(
-                          Icons.mic,
-                          color: Colors.purple,
-                          size: 20,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.center,
+            items:
+                configs.map((XiaozhiConfig config) {
+                  return DropdownMenuItem<XiaozhiConfig>(
+                    value: config,
+                    child: Container(
+                      margin: const EdgeInsets.symmetric(vertical: 8.0),
+                      child: Row(
                         children: [
-                          Text(
-                            config.name,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.black,
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.purple.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(
+                              Icons.mic,
+                              color: Colors.purple,
+                              size: 20,
                             ),
                           ),
-                          Text(
-                            config.websocketUrl.split('/').last,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey.shade600,
-                            ),
-                            overflow: TextOverflow.ellipsis,
+                          const SizedBox(width: 12),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                config.name,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.black,
+                                ),
+                              ),
+                              Text(
+                                config.websocketUrl.split('/').last,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey.shade600,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
                           ),
                         ],
                       ),
-                    ],
-                  ),
-                ),
-              );
-            }).toList(),
+                    ),
+                  );
+                }).toList(),
             onChanged: (XiaozhiConfig? newValue) {
               setState(() {
                 _selectedXiaozhiConfig = newValue;
@@ -658,6 +665,11 @@ class _ConversationTypeScreenState extends State<ConversationTypeScreen> {
           _buildDetailItemXiaozhi(
             'Token 自动授权',
             config.enableAutoAuth ? '已开启' : '已关闭',
+          ),
+          const SizedBox(height: 12),
+          _buildDetailItemXiaozhi(
+            'Token',
+            config.token.isEmpty ? '未配置' : '已配置',
           ),
         ],
       ),
@@ -802,53 +814,54 @@ class _ConversationTypeScreenState extends State<ConversationTypeScreen> {
               fontWeight: FontWeight.w500,
               color: Colors.black,
             ),
-            items: configs.map((DifyConfig config) {
-              return DropdownMenuItem<DifyConfig>(
-                value: config,
-                child: Container(
-                  margin: const EdgeInsets.symmetric(vertical: 8.0),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.blue.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Icon(
-                          Icons.chat_bubble_outline,
-                          color: Colors.blue,
-                          size: 20,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.center,
+            items:
+                configs.map((DifyConfig config) {
+                  return DropdownMenuItem<DifyConfig>(
+                    value: config,
+                    child: Container(
+                      margin: const EdgeInsets.symmetric(vertical: 8.0),
+                      child: Row(
                         children: [
-                          Text(
-                            config.name,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.black,
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.blue.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(
+                              Icons.chat_bubble_outline,
+                              color: Colors.blue,
+                              size: 20,
                             ),
                           ),
-                          Text(
-                            config.apiUrl.split('/').last,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey.shade600,
-                            ),
-                            overflow: TextOverflow.ellipsis,
+                          const SizedBox(width: 12),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                config.name,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.black,
+                                ),
+                              ),
+                              Text(
+                                config.apiUrl.split('/').last,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey.shade600,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
                           ),
                         ],
                       ),
-                    ],
-                  ),
-                ),
-              );
-            }).toList(),
+                    ),
+                  );
+                }).toList(),
             onChanged: (DifyConfig? newValue) {
               setState(() {
                 _selectedDifyConfig = newValue;
@@ -920,7 +933,7 @@ class _ConversationTypeScreenState extends State<ConversationTypeScreen> {
           const SizedBox(height: 12),
           _buildDetailItemDify(
             'API Key',
-            '${config.apiKey.substring(0, 5)}...',
+            config.apiKey.isEmpty ? '未配置' : '已配置',
           ),
         ],
       ),
@@ -998,9 +1011,10 @@ class _ConversationTypeScreenState extends State<ConversationTypeScreen> {
             borderRadius: BorderRadius.circular(12),
           ),
           elevation: _selectedType == null ? 0 : 4,
-          shadowColor: _selectedType == null
-              ? Colors.transparent
-              : Colors.black.withOpacity(0.3),
+          shadowColor:
+              _selectedType == null
+                  ? Colors.transparent
+                  : Colors.black.withOpacity(0.3),
         ),
         child: const Text(
           '创建对话',
@@ -1108,53 +1122,54 @@ class _ConversationTypeScreenState extends State<ConversationTypeScreen> {
               fontWeight: FontWeight.w500,
               color: Colors.black,
             ),
-            items: configs.map((MiniMaxConfig config) {
-              return DropdownMenuItem<MiniMaxConfig>(
-                value: config,
-                child: Container(
-                  margin: const EdgeInsets.symmetric(vertical: 8.0),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.teal.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Icon(
-                          Icons.auto_awesome,
-                          color: Colors.teal,
-                          size: 20,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.center,
+            items:
+                configs.map((MiniMaxConfig config) {
+                  return DropdownMenuItem<MiniMaxConfig>(
+                    value: config,
+                    child: Container(
+                      margin: const EdgeInsets.symmetric(vertical: 8.0),
+                      child: Row(
                         children: [
-                          Text(
-                            config.name,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.black,
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.teal.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(
+                              Icons.auto_awesome,
+                              color: Colors.teal,
+                              size: 20,
                             ),
                           ),
-                          Text(
-                            config.model,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey.shade600,
-                            ),
-                            overflow: TextOverflow.ellipsis,
+                          const SizedBox(width: 12),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                config.name,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.black,
+                                ),
+                              ),
+                              Text(
+                                config.model,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey.shade600,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
                           ),
                         ],
                       ),
-                    ],
-                  ),
-                ),
-              );
-            }).toList(),
+                    ),
+                  );
+                }).toList(),
             onChanged: (MiniMaxConfig? newValue) {
               setState(() {
                 _selectedMiniMaxConfig = newValue;
@@ -1226,7 +1241,7 @@ class _ConversationTypeScreenState extends State<ConversationTypeScreen> {
           const SizedBox(height: 12),
           _buildDetailItemMiniMax(
             'API Key',
-            '${config.apiKey.substring(0, 5)}...',
+            config.apiKey.isEmpty ? '未配置' : '已配置',
           ),
         ],
       ),

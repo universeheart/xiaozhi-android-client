@@ -10,6 +10,7 @@ import 'package:just_audio/just_audio.dart' as ja;
 import 'package:audio_session/audio_session.dart';
 import 'package:collection/collection.dart';
 import 'package:flutter_pcm_player/flutter_pcm_player.dart';
+import 'package:ai_assistant/audio/pcm_frame_buffer.dart';
 
 /// 音频工具类，用于处理Opus音频编解码和录制播放
 class AudioUtil {
@@ -17,6 +18,9 @@ class AudioUtil {
   static const int SAMPLE_RATE = 16000;
   static const int CHANNELS = 1;
   static const int FRAME_DURATION = 60; // 毫秒
+  static const int _bytesPerSample = 2;
+  static const int _samplesPerFrame = (SAMPLE_RATE * FRAME_DURATION) ~/ 1000;
+  static const int _frameBytes = _samplesPerFrame * _bytesPerSample * CHANNELS;
 
   static final AudioRecorder _audioRecorder = AudioRecorder();
   static ja.AudioPlayer? _player;
@@ -28,6 +32,9 @@ class AudioUtil {
       StreamController<Uint8List>.broadcast();
   static String? _tempFilePath;
   static Timer? _audioProcessingTimer;
+  static final PcmFrameBuffer _pcmFrameBuffer = PcmFrameBuffer(
+    frameBytes: _frameBytes,
+  );
 
   // Opus相关
   static final _encoder = SimpleOpusEncoder(
@@ -238,15 +245,18 @@ class AudioUtil {
         );
 
         _isRecording = true;
+        _pcmFrameBuffer.reset();
         print('$TAG: 流式录音启动成功');
 
         // 直接从流中处理数据
         stream.listen(
           (data) async {
-            if (data.isNotEmpty && data.length % 2 == 0) {
-              final opusData = await encodeToOpus(data);
-              if (opusData != null) {
-                _audioStreamController.add(opusData);
+            if (data.isNotEmpty) {
+              for (final frame in _pcmFrameBuffer.add(data)) {
+                final opusData = await encodeToOpus(frame);
+                if (opusData != null) {
+                  _audioStreamController.add(opusData);
+                }
               }
             }
           },
@@ -282,17 +292,23 @@ class AudioUtil {
     try {
       final path = await _audioRecorder.stop();
       _isRecording = false;
+      _pcmFrameBuffer.reset();
       print('$TAG: 停止录音: $path');
       return path;
     } catch (e) {
       print('$TAG: 停止录音失败: $e');
       _isRecording = false;
+      _pcmFrameBuffer.reset();
       return null;
     }
   }
 
   /// 将PCM数据编码为Opus格式
   static Future<Uint8List?> encodeToOpus(Uint8List pcmData) async {
+    if (pcmData.length != _frameBytes) {
+      return null;
+    }
+
     try {
       // 删除频繁日志
       // 转换PCM数据为Int16List (小端字节序，与Android一致)
@@ -303,29 +319,7 @@ class AudioUtil {
         ),
       );
 
-      // 确保数据长度符合Opus要求（必须是2.5ms、5ms、10ms、20ms、40ms或60ms的采样数）
-      final int samplesPerFrame = (SAMPLE_RATE * FRAME_DURATION) ~/ 1000;
-
-      Uint8List encoded;
-
-      // 处理过短的数据
-      if (pcmInt16.length < samplesPerFrame) {
-        // 对于过短的数据，可以通过添加静音来填充到所需长度
-        final Int16List paddedData = Int16List(samplesPerFrame);
-        for (int i = 0; i < pcmInt16.length; i++) {
-          paddedData[i] = pcmInt16[i];
-        }
-
-        // 编码填充后的数据
-        encoded = Uint8List.fromList(_encoder.encode(input: paddedData));
-      } else {
-        // 对于足够长的数据，裁剪到精确的帧长度
-        encoded = Uint8List.fromList(
-          _encoder.encode(input: pcmInt16.sublist(0, samplesPerFrame)),
-        );
-      }
-
-      return encoded;
+      return Uint8List.fromList(_encoder.encode(input: pcmInt16));
     } catch (e, stackTrace) {
       print('$TAG: Opus编码失败: $e');
       print(stackTrace);

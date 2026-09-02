@@ -39,4 +39,3 @@ class SettingsSection extends StatelessWidget {
     );
   }
 }
-

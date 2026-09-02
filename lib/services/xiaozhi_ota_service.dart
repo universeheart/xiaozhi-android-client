@@ -27,19 +27,46 @@ class XiaozhiOtaAuthorization {
       throw const FormatException('OTA 响应未下发有效 token');
     }
 
-    return XiaozhiOtaAuthorization(
-      websocketUrl: websocketUrl,
-      token: token,
-    );
+    return XiaozhiOtaAuthorization(websocketUrl: websocketUrl, token: token);
   }
 }
 
 class XiaozhiOtaService {
-  static const String otaUrl = 'http://175.24.226.167:8002/xiaozhi/ota/';
   static const String clientId = '7b94d69a-9808-4c59-9c9b-704333b38aff';
+
+  static String resolveOtaUrl({
+    required String configuredOtaUrl,
+    required String websocketUrl,
+  }) {
+    final configured = configuredOtaUrl.trim();
+    if (configured.isNotEmpty) {
+      return configured;
+    }
+
+    final websocket = Uri.parse(websocketUrl);
+    if (websocket.scheme != 'ws' && websocket.scheme != 'wss') {
+      throw const FormatException('WebSocket 地址必须以 ws:// 或 wss:// 开头');
+    }
+    if (websocket.host.isEmpty) {
+      throw const FormatException('WebSocket 地址缺少主机名或 IP');
+    }
+
+    final otaScheme = websocket.scheme == 'wss' ? 'https' : 'http';
+    final otaPort =
+        websocket.hasPort && websocket.port == 8000
+            ? 8002
+            : (websocket.hasPort ? websocket.port : null);
+    return Uri(
+      scheme: otaScheme,
+      host: websocket.host,
+      port: otaPort,
+      path: '/xiaozhi/ota/',
+    ).toString();
+  }
 
   Future<XiaozhiOtaAuthorization> authorize({
     required String deviceId,
+    required String otaUrl,
   }) async {
     final response = await http
         .post(
